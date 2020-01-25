@@ -592,6 +592,32 @@ void KTable::alignt(char value){
 }
 
 /*
+ Disables the trim rules for the specified column.
+ */
+void KTable::release_trim(size_t col_number){
+	
+	if (col_number >= ncols){
+		return;
+	}
+	
+	trim_rules[col_number].trim_enabled = false;
+	
+	table_up_to_date = false;
+	
+}
+
+/*
+Disables the trim rules for all columns.
+*/
+void KTable::release_trim(){
+	
+	for (size_t i = 0 ; i < ncols ; i++){
+		release_trim(i);
+	}
+	
+}
+
+/*
  Set a limit after which to trim cell width, and where to put the elipses.
  
  col_number - the column whose cells to trim
@@ -610,6 +636,20 @@ void KTable::trimc(size_t col_number, char alignment, size_t max_len){
 	trim_rules[col_number].len = max_len;
 	
 	table_up_to_date = false;
+}
+
+/*
+ Set a limit after which to trim cell width, and where to put the elipses.
+ 
+ alignment - where to omit data and replace with elipses (...). Options: 'l'=left, 'c'=center, 'r'=right
+ max_len - maximim number of characters to allow in the colum. Mimumum = 3
+ */
+void KTable::trimc(char alignment, size_t max_len){
+	
+	for (size_t i = 0 ; i < ncols ; i++){
+		trimc(i, alignment, max_len);
+	}
+	
 }
 
 /*

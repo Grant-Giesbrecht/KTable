@@ -55,7 +55,7 @@ public:
 	void alignh(char alignment); //Set the alignment of all header columns
 	void alignt(char alignment); //Set the alignment of the table title
 	
-	void release_trim(size_t col_numer); //Removes the trim rules from the specified column
+	void release_trim(size_t col_number); //Removes the trim rules from the specified column
 	void release_trim(); //Removes the trim rules for all columns
 	void trimc(size_t col_number, char alignment, size_t max_len); //Set a limit after which to trim cell width, and where to put the elipses
 	void trimc(char alignment, size_t max_len); //Set a limit after which to trim cell width, and where to put the elipses for all columns
