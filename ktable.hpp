@@ -27,6 +27,12 @@
 #include <vector>
 #include <sstream>
 
+typedef struct{
+	bool trim_enabled;
+	char alignment;
+	size_t len;
+}trim_state;
+
 class KTable{
 	
 public:
@@ -48,6 +54,11 @@ public:
 	void alignh(size_t col_number, char alignment); //Set the alignment of the specified header column
 	void alignh(char alignment); //Set the alignment of all header columns
 	void alignt(char alignment); //Set the alignment of the table title
+	
+	void release_trim(size_t col_numer); //Removes the trim rules from the specified column
+	void release_trim(); //Removes the trim rules for all columns
+	void trimc(size_t col_number, char alignment, size_t max_len); //Set a limit after which to trim cell width, and where to put the elipses
+	void trimc(char alignment, size_t max_len); //Set a limit after which to trim cell width, and where to put the elipses for all columns
 	
 	void set(short parameter, double value); //Set a parameter
 	void set(short parameter, bool value); //Set a parameter
@@ -75,6 +86,8 @@ private:
 	std::vector<char> header_alignment; //Alignment of header columns. (Options: l, c, r)
 	char title_alignment; //Alignment of title. (Options: l, c, r)
 	
+	std::vector<trim_state> trim_rules; //Contains the trim rules for every column
+	
 	bool print_sidewalls; //Walls at ends of table
 	bool print_headerinterwalls; //Walls between columns in header bar
 	bool print_interwalls; //Walls between columns
@@ -98,8 +111,10 @@ private:
 	
 	char default_alignment; //Default alignment to assign to new data columns
 	char default_header_alignment; //Default alignment to assign to new header columns
+	trim_state default_trim_state; //Default trim rules to assign to new data columns
 	
-	
+	size_t trimmed_size(size_t row, size_t col); //Get the length of the data in a cell AFTER trim applied, given the cell's position
+	std::string trimmed_contents(size_t row, size_t col); //Get the contents of the data in a cell AFTER trim applied, given the cell's position
 	
 	//From Synaptik ( https://stackoverflow.com/questions/14765155/how-can-i-easily-format-my-data-table-in-c )
 	/* Convert double to string with specified number of places after the decimal

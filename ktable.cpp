@@ -43,6 +43,10 @@ KTable::KTable(){
 	default_alignment = 'r';
 	default_header_alignment = 'c';
 	
+	default_trim_state.trim_enabled = false;
+	default_trim_state.alignment = 'c';
+	default_trim_state.len = 15;
+	
 }
 
 /*
@@ -71,6 +75,11 @@ void KTable::row(std::vector<std::string> nrow){
 		while (alignment.size() < ncols){
 			alignment.push_back(default_alignment);
 			header_alignment.push_back(default_header_alignment);
+		}
+		
+		//Update the trim rules
+		while (trim_rules.size() < ncols){
+			trim_rules.push_back(default_trim_state);
 		}
 		
 	}else if(nrow.size() < ncols){ //If the new row is too small...
@@ -174,8 +183,8 @@ void KTable::generate_table(){
 	for (size_t cc = 0 ; cc < ncols ; cc++){ //For each column...
 		column_widths.push_back(0); //Set width to zero
 		for (size_t rr = 0 ; rr < contents.size() ; rr++){ //Then check each row...
-			if (contents[rr][cc].length() > column_widths[cc]){ //And if the element is bigger than the recorded max...
-				column_widths[cc] = contents[rr][cc].length(); //Record the new max
+			if (trimmed_size(rr, cc) > column_widths[cc]){ //And if the element is bigger than the recorded max...
+				column_widths[cc] = trimmed_size(rr, cc); //Record the new max
 			}
 		}
 		column_widths[cc] += col_padding; //Then add the padding to the column
@@ -323,27 +332,27 @@ void KTable::generate_table(){
 			
 			if (alignment[c] == 'l'){ //left
 				if (col_padding >= 2){
-					table_line = table_line + ' ' + left(contents[rr][c], column_widths[c]-2) + ' ';
+					table_line = table_line + ' ' + left(trimmed_contents(rr, c), column_widths[c]-2) + ' ';
 				}else if (col_padding == 1){
-					table_line = table_line + ' ' + left(contents[rr][c], column_widths[c]-1);
+					table_line = table_line + ' ' + left(trimmed_contents(rr, c), column_widths[c]-1);
 				}else{
-					table_line = table_line + left(contents[rr][c], column_widths[c]);
+					table_line = table_line + left(trimmed_contents(rr, c), column_widths[c]);
 				}
 			}else if(alignment[c] =='r'){ //right
 				if (col_padding >= 2){
-					table_line = table_line + ' ' + right(contents[rr][c], column_widths[c]-2) + ' ';
+					table_line = table_line + ' ' + right(trimmed_contents(rr, c), column_widths[c]-2) + ' ';
 				}else if (col_padding == 1){
-					table_line = table_line + ' ' + right(contents[rr][c], column_widths[c]-1);
+					table_line = table_line + ' ' + right(trimmed_contents(rr, c), column_widths[c]-1);
 				}else{
-					table_line = table_line + right(contents[rr][c], column_widths[c]);
+					table_line = table_line + right(trimmed_contents(rr, c), column_widths[c]);
 				}
 			}else{ //'c', center
 				if (col_padding >= 2){
-					table_line = table_line + ' ' + center(contents[rr][c], column_widths[c]-2) + ' ';
+					table_line = table_line + ' ' + center(trimmed_contents(rr, c), column_widths[c]-2) + ' ';
 				}else if (col_padding == 1){
-					table_line = table_line + ' ' + center(contents[rr][c], column_widths[c]-1);
+					table_line = table_line + ' ' + center(trimmed_contents(rr, c), column_widths[c]-1);
 				}else{
-					table_line = table_line + center(contents[rr][c], column_widths[c]);
+					table_line = table_line + center(trimmed_contents(rr, c), column_widths[c]);
 				}
 			}
 			
@@ -438,6 +447,8 @@ void KTable::set(short parameter, bool value){
 			print_headerhbar = value;
 			break;
 	}
+	
+	table_up_to_date = false;
 }
 
 /*
@@ -460,6 +471,8 @@ void KTable::set(short parameter, char value){
 			hbar_char = value;
 			break;
 	}
+	
+	table_up_to_date = false;
 }
 
 /*
@@ -476,6 +489,8 @@ void KTable::set(short parameter, double value){
 			col_padding = int(abs(value));
 			break;
 	}
+	
+	table_up_to_date = false;
 }
 
 /*
@@ -508,6 +523,8 @@ void KTable::alignc(size_t col_number, char value){
 	}
 	if (col_number > alignment.size()) return; //Return if col_number out of bounds
 	alignment[col_number] = value; //Set parameter
+	
+	table_up_to_date = false;
 }
 
 /*
@@ -521,6 +538,8 @@ void KTable::alignc(char value){
 	for (size_t col = 0 ; col < ncols ; col++){
 		alignc(col, value);
 	}
+	
+	table_up_to_date = false;
 }
 
 /*
@@ -537,6 +556,8 @@ void KTable::alignh(size_t col_number, char value){
 	}
 	if (col_number > header_alignment.size()) return; //Return if col_number out of bounds
 	header_alignment[col_number] = value; //Set parameter
+	
+	table_up_to_date = false;
 }
 
 /*
@@ -550,6 +571,8 @@ void KTable::alignh(char value){
 	for (size_t col = 0 ; col < ncols ; col++){
 		alignh(col, value);
 	}
+	
+	table_up_to_date = false;
 }
 
 /*
@@ -564,6 +587,29 @@ void KTable::alignt(char value){
 		value = default_header_alignment;
 	}
 	title_alignment = value; //Set parameter
+	
+	table_up_to_date = false;
+}
+
+/*
+ Set a limit after which to trim cell width, and where to put the elipses.
+ 
+ col_number - the column whose cells to trim
+ alignment - where to omit data and replace with elipses (...). Options: 'l'=left, 'c'=center, 'r'=right
+ max_len - maximum number of characters to allow in the colum. Minimum = 3
+ */
+void KTable::trimc(size_t col_number, char alignment, size_t max_len){
+	
+	// Ensure mex_len is at least 3 (length of elipses)
+	if (max_len < 3){
+		max_len = 3;
+	}
+	
+	trim_rules[col_number].trim_enabled = true;
+	trim_rules[col_number].alignment = alignment;
+	trim_rules[col_number].len = max_len;
+	
+	table_up_to_date = false;
 }
 
 /*
@@ -669,4 +715,59 @@ void KTable::nxtreset(){
 	next_is_good = true;
 	nxtstr_line = 0;
 	
+}
+
+/*
+ Get the length of the data in a cell AFTER trim applied, given the cell's position
+ */
+size_t KTable::trimmed_size(size_t row, size_t col){
+	
+	if (trim_rules[col].trim_enabled){
+		if (contents[row][col].length() <= trim_rules[col].len){
+			return contents[row][col].length();
+		}else{
+			return trim_rules[col].len;
+		}
+	}else{
+		return contents[row][col].length();
+	}
+	
+}
+
+/*
+ Get the contents of the data in a cell AFTER trim applied, given the cell's position
+ */
+std::string KTable::trimmed_contents(size_t row, size_t col){
+	
+	if (trim_rules[col].trim_enabled){
+		if (contents[row][col].length() <= trim_rules[col].len){
+			return contents[row][col];
+		}else{
+			
+			size_t from_left, from_right;
+			std::string seq;
+			std::string out_str = "";
+			switch(trim_rules[col].alignment){
+				case('l'):
+					seq = "... ";
+					out_str = seq + contents[row][col].substr( contents[row][col].length() - trim_rules[col].len + seq.length());
+					break;
+				case('c'):
+					seq = " ... ";
+					from_left = floor(((double)(trim_rules[col].len - seq.length()))/2);
+					from_right = ceil(((double)(trim_rules[col].len - seq.length()))/2);
+					out_str = contents[row][col].substr(0, from_left) + seq + contents[row][col].substr(contents[row][col].length()-from_right);
+					break;
+				case('r'):
+					seq = " ...";
+					out_str = contents[row][col].substr( contents[row][col].length() - (trim_rules[col].len-seq.length()) ) + seq;
+					break;
+			}
+			
+			return out_str;
+			
+		}
+	}else{
+		return contents[row][col];
+	}
 }
